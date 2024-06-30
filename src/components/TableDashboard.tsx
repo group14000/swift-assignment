@@ -13,6 +13,8 @@ const TableDashboard: React.FC = () => {
     const [comments, setComments] = useState<Comment[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Comment, direction: 'ascending' | 'descending' } | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         axios.get('https://jsonplaceholder.typicode.com/comments')
@@ -24,10 +26,40 @@ const TableDashboard: React.FC = () => {
             });
     }, []);
 
+    const sortedComments = React.useMemo(() => {
+        let sortableComments = [...comments];
+
+        if (sortConfig !== null) {
+            sortableComments.sort((a, b) => {
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return sortableComments.filter(comment =>
+            comment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            comment.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            comment.body.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [comments, sortConfig, searchTerm]);
+
+    const requestSort = (key: keyof Comment) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
     // Calculate the index of the first and last items on the current page
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentComments = comments.slice(indexOfFirstItem, indexOfLastItem);
+    const currentComments = sortedComments.slice(indexOfFirstItem, indexOfLastItem);
 
     // Change page
     const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
@@ -45,14 +77,31 @@ const TableDashboard: React.FC = () => {
             </nav>
             <main className="p-4">
                 <div className="flex items-center space-x-4 p-4 bg-white shadow rounded">
-                    <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Sort Post ID</button>
-                    <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Sort Name</button>
-                    <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Sort Email</button>
+                    <button
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        onClick={() => requestSort('postId')}
+                    >
+                        Sort Post ID
+                    </button>
+                    <button
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        onClick={() => requestSort('name')}
+                    >
+                        Sort Name
+                    </button>
+                    <button
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        onClick={() => requestSort('email')}
+                    >
+                        Sort Email
+                    </button>
                     <div className="flex-grow">
                         <input
                             type="text"
                             className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
                             placeholder="Search name, email, comment"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                 </div>
@@ -78,7 +127,7 @@ const TableDashboard: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                    <div className="flex justify-between items-center mb-4">
+                    <div className="flex justify-between items-center mt-4">
                         <div>
                             <label htmlFor="itemsPerPage" className="mr-2">Show:</label>
                             <select
@@ -93,7 +142,7 @@ const TableDashboard: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            {Array.from({ length: Math.ceil(comments.length / itemsPerPage) }, (_, index) => (
+                            {Array.from({ length: Math.ceil(sortedComments.length / itemsPerPage) }, (_, index) => (
                                 <button
                                     key={index}
                                     onClick={() => paginate(index + 1)}
